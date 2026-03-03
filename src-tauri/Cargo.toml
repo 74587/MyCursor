@@ -1,6 +1,6 @@
 [package]
 name = "mycursor"
-version = "1.0.0"
+version = "1.0.1"
 description = "MyCursor - Machine ID and Token Management Tool"
 authors = ["MyCursor Team"]
 edition = "2021"

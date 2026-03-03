@@ -1,6 +1,6 @@
 {
   "name": "mycursor",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MyCursor - Cursor编辑器管理工具",
   "type": "module",
   "scripts": {
