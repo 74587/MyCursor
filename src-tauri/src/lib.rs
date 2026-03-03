@@ -1844,7 +1844,90 @@ async fn open_update_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 打开内置浏览器让用户手动登录，持续轮询 Cookie 直到获取 WorkosCursorSessionToken
+#[tauri::command]
+async fn open_login_for_session_token(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    log_info!("🚀 打开登录页面获取 SessionToken");
 
+    let window_label = "login_session_token";
+
+    // 关闭已有窗口
+    if let Some(w) = app.get_webview_window(window_label) {
+        let _ = w.close();
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+    }
+
+    let app_handle = app.clone();
+
+    let webview_window = tauri::WebviewWindowBuilder::new(
+        &app,
+        window_label,
+        tauri::WebviewUrl::External("https://authenticator.cursor.sh/".parse().unwrap()),
+    )
+    .title("Cursor - 登录获取 SessionToken")
+    .inner_size(1200.0, 800.0)
+    .resizable(true)
+    .visible(true)
+    .incognito(true)
+    .build();
+
+    match webview_window {
+        Ok(window) => {
+            // 后台轮询 Cookie，每 2 秒检测一次
+            let win = window.clone();
+            tokio::spawn(async move {
+                let urls_to_try = [
+                    "https://authenticator.cursor.sh/",
+                    "https://cursor.com/",
+                    "https://www.cursor.com/",
+                ];
+
+                for _ in 0..150 {
+                    // 最多轮询 5 分钟
+                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+                    // 窗口已被用户关闭则退出
+                    if win.is_visible().unwrap_or(false) == false && win.is_minimized().unwrap_or(false) == false {
+                        // 额外判断：尝试获取标题，失败说明窗口已销毁
+                        if win.title().is_err() {
+                            log_info!("🔒 登录窗口已关闭，停止轮询");
+                            return;
+                        }
+                    }
+
+                    for url_str in &urls_to_try {
+                        let url = match url_str.parse() {
+                            Ok(u) => u,
+                            Err(_) => continue,
+                        };
+                        if let Ok(cookies) = win.cookies_for_url(url) {
+                            for cookie in cookies {
+                                if cookie.name() == "WorkosCursorSessionToken" {
+                                    let token = cookie.value().to_string();
+                                    log_info!("✅ 获取到 SessionToken: {}...", &token[..token.len().min(30)]);
+
+                                    let _ = app_handle.emit("session-token-obtained", serde_json::json!({ "token": token }));
+
+                                    let _ = win.close();
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                log_warn!("⏰ 轮询 SessionToken 超时（5分钟）");
+                let _ = win.close();
+            });
+
+            Ok(serde_json::json!({ "success": true, "message": "登录窗口已打开" }))
+        }
+        Err(e) => {
+            log_error!("❌ 创建登录窗口失败: {}", e);
+            Ok(serde_json::json!({ "success": false, "message": format!("打开登录窗口失败: {}", e) }))
+        }
+    }
+}
 
 #[tauri::command]
 async fn auto_login_and_get_cookie(
@@ -2770,6 +2853,7 @@ pub fn run() {
             get_saved_accounts,
             get_app_version,
             open_update_url,
+            open_login_for_session_token,
             auto_login_and_get_cookie,
             check_login_cookies,
             auto_login_success,
