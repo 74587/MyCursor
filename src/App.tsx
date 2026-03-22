@@ -5,16 +5,11 @@ import { Icon } from "@/components/Icon";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { hybridStorage } from "@/utils/hybridStorage";
 
-// Lazy load page components for better performance
-const MachineIdPage = lazy(() => import("@/pages/MachineIdPage"));
-const AccountManagePage = lazy(() =>
-  import("@/pages/AccountManagePage").then((module) => ({
-    default: module.AccountManagePage,
-  }))
-);
-const UsageStatsPage = lazy(() => import("@/pages/UsageStatsPage"));
-const SeamlessPage = lazy(() => import("@/pages/SeamlessPage"));
-const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+const MachineIdPage = lazy(() => import("@/features/identity/IdentityPage"));
+const AccountManagePage = lazy(() => import("@/features/accounts/AccountsPage"));
+const UsageStatsPage = lazy(() => import("@/features/analytics/AnalyticsPage"));
+const SeamlessPage = lazy(() => import("@/features/seamless/SeamlessPage"));
+const SettingsPage = lazy(() => import("@/features/settings/SettingsPage"));
 
 type PageType = "machineId" | "account" | "seamless" | "usage" | "settings";
 
