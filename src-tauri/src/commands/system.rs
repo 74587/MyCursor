@@ -192,17 +192,22 @@ pub async fn check_user_authorization(token: String) -> Result<crate::domain::au
         let data: serde_json::Value = serde_json::from_str(&text).unwrap_or(serde_json::json!(null));
 
         // 从 Stripe profile 响应中解析订阅信息
-        // 响应结构: { customer: { email }, subscription: { membershipType, status }, trialDaysRemaining }
         let customer_email = data.get("customer")
             .and_then(|c| c.get("email"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
+        // 优先使用 individualMembershipType（真实会员类型，如 ultra），
+        // 没有时回退到 membershipType（对所有付费用户可能返回 pro）
         let subscription = data.get("subscription");
-        let subscription_type = subscription
-            .and_then(|s| s.get("membershipType"))
-            .or(data.get("membershipType"))
+        let subscription_type = data.get("individualMembershipType")
             .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .or_else(|| subscription
+                .and_then(|s| s.get("membershipType"))
+                .and_then(|v| v.as_str()))
+            .or_else(|| data.get("membershipType")
+                .and_then(|v| v.as_str()))
             .map(|s| s.to_string());
 
         let subscription_status = subscription
