@@ -102,9 +102,17 @@ impl<'a> StorageJson<'a> {
         let mut data = self.read_all().unwrap_or_else(|_| serde_json::json!({}));
 
         if let Some(obj) = data.as_object_mut() {
-            obj.remove("cursorAuth/cachedEmail");
-            obj.remove("cursorAuth/accessToken");
-            obj.remove("cursorAuth/refreshToken");
+            let auth_fields = [
+                "cursorAuth/cachedEmail",
+                "cursorAuth/accessToken",
+                "cursorAuth/refreshToken",
+                "cursorAuth/cachedSignUpType",
+                "cursor.email",
+                "cursor.accessToken",
+            ];
+            for field in auth_fields {
+                obj.remove(field);
+            }
         }
 
         self.write_all(&data)

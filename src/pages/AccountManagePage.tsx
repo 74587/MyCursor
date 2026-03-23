@@ -341,6 +341,30 @@ export const AccountManagePage: React.FC = () => {
     });
   }, []);
 
+  const handleLogout = useCallback(() => {
+    setConfirmDialog({
+      show: true,
+      title: "登出当前账号",
+      message: "确定要登出吗？\n\n此操作将清除本地认证数据（storage.json 和 SQLite），下次使用需要重新登录。",
+      type: "warning",
+      confirmText: "确认登出",
+      onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, show: false }));
+        try {
+          const { AccountService } = await import("../services/accountService");
+          const result = await AccountService.logoutCurrentAccount();
+          setToast({ message: result.message || "已登出", type: result.success ? "success" : "error" });
+          if (result.success) {
+            await loadAccounts();
+          }
+        } catch (error) {
+          console.error("Failed to logout:", error);
+          setToast({ message: "登出失败", type: "error" });
+        }
+      },
+    });
+  }, [loadAccounts]);
+
   const handleExportSelectedAccounts = useCallback(async () => {
     if (selectedAccounts.size === 0) {
       setToast({ message: "请先选择要导出的账户", type: "error" });
@@ -534,6 +558,7 @@ export const AccountManagePage: React.FC = () => {
         onViewDashboard={handleViewDashboard}
         onViewBindCard={handleViewBindCard}
         onDeleteCursorAccount={handleDeleteCursorAccount}
+        onLogout={handleLogout}
         onToast={(message, type) => setToast({ message, type })}
       />
     );
@@ -553,6 +578,7 @@ export const AccountManagePage: React.FC = () => {
     handleViewDashboard,
     handleViewBindCard,
     handleDeleteCursorAccount,
+    handleLogout,
   ]);
 
   if (loading && !accountData) {

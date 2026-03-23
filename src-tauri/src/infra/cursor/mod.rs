@@ -62,4 +62,24 @@ impl CursorBridge {
     pub fn process(&self) -> process::ProcessManager {
         process::ProcessManager::new()
     }
+
+    /// 获取完整的 Machine IDs（综合 storage.json + state.vscdb + 系统注册表）
+    ///
+    /// serviceMachineId 优先从 state.vscdb 读取（权威来源），回退到 storage.json。
+    /// machineGuid 和 sqmClientId 从系统注册表补充（Windows）。
+    pub fn read_full_machine_ids(&self) -> Result<crate::domain::identity::MachineIds, AppError> {
+        let mut ids = self.storage().read_machine_ids()?;
+
+        if ids.service_machine_id.is_empty() {
+            if let Ok(Some(db_value)) = self.sqlite().read_service_machine_id() {
+                ids.service_machine_id = db_value;
+            }
+        }
+
+        let (guid, sqm) = crate::infra::platform::read_registry_ids();
+        if ids.machine_guid.is_none() { ids.machine_guid = guid; }
+        if ids.sqm_client_id.is_none() { ids.sqm_client_id = sqm; }
+
+        Ok(ids)
+    }
 }

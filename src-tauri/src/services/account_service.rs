@@ -246,6 +246,7 @@ impl AccountService {
                         ..existing.clone()
                     }))
                 } else {
+                    let current_ids = self.cursor.read_full_machine_ids().ok();
                     Ok(Some(AccountInfo {
                         email,
                         token,
@@ -255,7 +256,7 @@ impl AccountService {
                         created_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                         username: None,
                         tags: Vec::new(),
-                        machine_ids: None,
+                        machine_ids: current_ids,
                         subscription_type: None,
                         subscription_status: None,
                         trial_days_remaining: None,

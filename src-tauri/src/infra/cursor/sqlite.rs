@@ -39,6 +39,14 @@ impl<'a> CursorSqlite<'a> {
         self.get_value("cursorAuth/accessToken")
     }
 
+    /// 读取 serviceMachineId
+    pub fn read_service_machine_id(&self) -> Result<Option<String>, AppError> {
+        if !self.path.exists() {
+            return Ok(None);
+        }
+        self.get_value("storage.serviceMachineId")
+    }
+
     /// 更新 serviceMachineId
     pub fn update_service_machine_id(&self, id: &str) -> Result<(), AppError> {
         self.upsert("storage.serviceMachineId", id)
@@ -46,9 +54,12 @@ impl<'a> CursorSqlite<'a> {
 
     /// 清除所有认证数据
     pub fn clear_auth_data(&self) -> Result<(), AppError> {
+        if !self.path.exists() {
+            return Ok(());
+        }
         let conn = Connection::open(self.path)?;
         conn.execute(
-            "DELETE FROM ItemTable WHERE key LIKE 'cursorAuth/%'",
+            "DELETE FROM ItemTable WHERE key LIKE 'cursorAuth/%' OR key IN ('cursor.email', 'cursor.accessToken')",
             [],
         )?;
         Ok(())

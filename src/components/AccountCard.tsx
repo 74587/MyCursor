@@ -21,6 +21,7 @@ interface AccountCardProps {
   onViewDashboard: (account: AccountInfo) => void;
   onViewBindCard: (account: AccountInfo) => void;
   onDeleteCursorAccount: (account: AccountInfo) => void;
+  onLogout?: () => void;
   onToast: (message: string, type: "success" | "error") => void;
 }
 
@@ -42,6 +43,7 @@ export const AccountCard = memo(({
   onViewDashboard,
   onViewBindCard,
   onDeleteCursorAccount,
+  onLogout,
   onToast,
 }: AccountCardProps) => {
   // ——— 菜单定位（使用 Portal 渲染，避免父容器裁剪和点击穿透）
@@ -421,8 +423,26 @@ export const AccountCard = memo(({
               绑卡
             </button>
 
-            {/* 切换/删除按钮（非当前账户） */}
-            {!isCurrent ? (
+            {/* 当前账号：登出按钮；非当前账号：切换+删除 */}
+            {isCurrent ? (
+              onLogout && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onCloseMenu(); onLogout(); }}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', padding: '4px 8px', fontSize: '12px', fontWeight: '500',
+                    borderRadius: 'var(--border-radius)', border: '1px solid #f97316', cursor: 'pointer',
+                    transition: 'all var(--transition-duration) ease', backgroundColor: '#fff7ed', color: '#ea580c', whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.backgroundColor = '#ffedd5'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.backgroundColor = '#fff7ed'; }}
+                  title="登出当前账号（清除本地认证数据）"
+                >
+                  <Icon name="logout" size={12} style={{ marginRight: '2px' }} />
+                  登出
+                </button>
+              )
+            ) : (
               <>
                 <button
                   type="button"
@@ -450,13 +470,13 @@ export const AccountCard = memo(({
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.backgroundColor = '#fee2e2'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.backgroundColor = '#fef2f2'; }}
-                  title="删除账户"
+                  title="从本地列表中删除"
                 >
                   <Icon name="trash" size={12} style={{ marginRight: '2px' }} />
                   删除
                 </button>
               </>
-            ) : null}
+            )}
 
             {/* 用量按钮 */}
             <button
@@ -492,22 +512,24 @@ export const AccountCard = memo(({
               编辑
             </button>
 
-            {/* 注销 Cursor 账户按钮 */}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onCloseMenu(); onDeleteCursorAccount(account); }}
-              style={{
-                display: 'inline-flex', alignItems: 'center', padding: '4px 8px', fontSize: '12px', fontWeight: '500',
-                borderRadius: 'var(--border-radius)', border: '1px solid #f97316', cursor: 'pointer',
-                transition: 'all var(--transition-duration) ease', backgroundColor: '#fff7ed', color: '#ea580c', whiteSpace: 'nowrap'
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.backgroundColor = '#ffedd5'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.backgroundColor = '#fff7ed'; }}
-              title="注销 Cursor 账户（不可恢复）"
-            >
-              <Icon name="logout" size={12} style={{ marginRight: '2px' }} />
-              注销
-            </button>
+            {/* 注销 Cursor 账户按钮（仅非当前账号显示） */}
+            {!isCurrent && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onCloseMenu(); onDeleteCursorAccount(account); }}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', padding: '4px 8px', fontSize: '12px', fontWeight: '500',
+                  borderRadius: 'var(--border-radius)', border: '1px solid #ef4444', cursor: 'pointer',
+                  transition: 'all var(--transition-duration) ease', backgroundColor: '#fef2f2', color: '#dc2626', whiteSpace: 'nowrap'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.backgroundColor = '#fee2e2'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.backgroundColor = '#fef2f2'; }}
+                title="注销 Cursor 账户（调用官方 API，永久删除，不可恢复）"
+              >
+                <Icon name="close" size={12} style={{ marginRight: '2px' }} />
+                注销
+              </button>
+            )}
           </div>
         </>,
         document.body

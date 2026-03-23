@@ -116,32 +116,73 @@ pub async fn open_bind_card_info(
     }
 }
 
-/// 删除 Cursor 账户
+/// 注销 Cursor 账户（调用官方 delete-account API，永久删除）
+///
+/// 优先使用 workos_cursor_session_token 构造 Cookie 认证；
+/// 若无 session token，则从 access_token 拼接伪造 Cookie。
 #[tauri::command]
 #[specta::specta]
 pub async fn delete_cursor_account(
-    session_token: String,
-    email: String,
+    access_token: String,
+    workos_cursor_session_token: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
-    let cookie = crate::infra::api::CursorApiClient::build_workos_cookie(&session_token);
+    log_info!("开始调用 Cursor 删除账户 API...");
 
-    let resp = client
-        .post("https://www.cursor.com/api/dashboard/delete-account")
-        .header("Cookie", &cookie)
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({"email": email}))
+    let cookie = match &workos_cursor_session_token {
+        Some(wt) if !wt.is_empty() => format!("WorkosCursorSessionToken={}", wt),
+        _ => {
+            let token_part = crate::infra::api::checksum::TokenParser::extract_token_part(&access_token);
+            format!("WorkosCursorSessionToken=user_01000000000000000000000000%3A%3A{}", token_part)
+        }
+    };
+
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("Accept", "*/*".parse().unwrap());
+    headers.insert("Accept-Encoding", "gzip, deflate, br, zstd".parse().unwrap());
+    headers.insert("Content-Type", "application/json".parse().unwrap());
+    headers.insert("Origin", "https://cursor.com".parse().unwrap());
+    headers.insert("Referer", "https://cursor.com/dashboard?tab=settings".parse().unwrap());
+    headers.insert("Cookie", cookie.parse().unwrap());
+    headers.insert(
+        "User-Agent",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
+            .parse().unwrap(),
+    );
+
+    let client = reqwest::Client::new();
+    match client
+        .post("https://cursor.com/api/dashboard/delete-account")
+        .headers(headers)
+        .body("{}")
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+    {
+        Ok(resp) => {
+            let status = resp.status().as_u16();
+            let body = resp.text().await.unwrap_or_default();
 
-    let status = resp.status().as_u16();
-    if status == 200 {
-        log_info!("Cursor 账户 {} 已注销", email);
-        Ok(serde_json::json!({"success": true, "message": format!("账户 {} 已注销", email)}))
-    } else {
-        let text = resp.text().await.unwrap_or_default();
-        Ok(serde_json::json!({"success": false, "status": status, "message": text}))
+            if status == 200 {
+                log_info!("Cursor 账户注销成功");
+                Ok(serde_json::json!({
+                    "success": true,
+                    "status": status,
+                    "message": format!("删除账户请求成功，状态码: {}", status),
+                    "response_body": body
+                }))
+            } else {
+                log_error!("Cursor 账户注销失败，状态码: {}", status);
+                Ok(serde_json::json!({
+                    "success": false,
+                    "status": status,
+                    "message": format!("删除账户失败，状态码: {}, 响应: {}", status, body),
+                    "response_body": body
+                }))
+            }
+        }
+        Err(e) => {
+            log_error!("Cursor 删除账户请求失败: {}", e);
+            Err(format!("请求失败: {}", e))
+        }
     }
 }
 

@@ -104,7 +104,8 @@ pub async fn add_account(
     machine_ids_json: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let machine_ids = machine_ids_json
-        .and_then(|json| serde_json::from_str(&json).ok());
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .or_else(|| service.cursor().read_full_machine_ids().ok());
 
     let account = AccountInfo {
         email: email.clone(),
@@ -164,6 +165,11 @@ pub async fn edit_account(
 }
 
 /// 带选项切换账号
+///
+/// 根据选项处理机器码：
+/// - use_bound_machine_id=true：恢复账号绑定的机器码到所有存储位置
+/// - reset_machine_id=true：生成新机器码并写入所有存储位置，同时更新账号绑定
+/// - 都为 false：保持当前机器码不变
 #[tauri::command]
 #[specta::specta]
 pub async fn switch_account_with_options(
@@ -172,10 +178,35 @@ pub async fn switch_account_with_options(
     reset_machine_id: bool,
     use_bound_machine_id: bool,
 ) -> Result<SwitchAccountResult, String> {
-    if reset_machine_id && !use_bound_machine_id {
-        let ids = crate::domain::identity::MachineIds::generate();
-        let cursor = service.cursor();
-        let _ = cursor.storage().write_machine_ids(&ids);
+    let cursor = service.cursor();
+
+    if use_bound_machine_id {
+        let accounts = service.store().load_all().map_err(|e| e.to_string())?;
+        if let Some(account) = accounts.iter().find(|a| a.email == email) {
+            if let Some(ref ids) = account.machine_ids {
+                let _ = cursor.storage().write_machine_ids(ids);
+                let _ = cursor.sqlite().update_service_machine_id(&ids.service_machine_id);
+                let platform = crate::infra::platform::create();
+                let _ = platform.update_system_ids(ids);
+            }
+        }
+    } else if reset_machine_id {
+        let new_ids = crate::domain::identity::MachineIds::generate();
+        let _ = cursor.storage().write_machine_ids(&new_ids);
+        let _ = cursor.sqlite().update_service_machine_id(&new_ids.service_machine_id);
+        let platform = crate::infra::platform::create();
+        let _ = platform.update_system_ids(&new_ids);
+
+        // 将新生成的机器码保存到该账号的绑定数据
+        let mut accounts = service.store().load_all().map_err(|e| e.to_string())?;
+        if let Some(acc) = accounts.iter_mut().find(|a| a.email == email) {
+            let mut bound_ids = new_ids;
+            let (guid, sqm) = crate::infra::platform::read_registry_ids();
+            bound_ids.machine_guid = guid;
+            bound_ids.sqm_client_id = sqm;
+            acc.machine_ids = Some(bound_ids);
+            let _ = service.store().save_all(&accounts);
+        }
     }
 
     service.switch(&email).map_err(|e| e.to_string())
