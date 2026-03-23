@@ -26,7 +26,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::menu::{MenuBuilder, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
 /// 关闭时最小化到托盘（true）还是直接退出（false）
@@ -119,8 +119,8 @@ pub fn run() {
             MINIMIZE_TO_TRAY.store(minimize, Ordering::SeqCst);
 
             // 配置系统托盘菜单
-            let show_item = MenuItemBuilder::with_id("show", "显示主窗口").build(app)?;
-            let quit_item = MenuItemBuilder::with_id("quit", "退出").build(app)?;
+            let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let tray_menu = MenuBuilder::new(app)
                 .item(&show_item)
                 .separator()
@@ -137,7 +137,7 @@ pub fn run() {
                 .icon_as_template(true)
                 .menu(&tray_menu)
                 .on_menu_event(move |_app, event| {
-                    match event.id().as_ref() {
+                    match event.id.as_ref() {
                         "show" => {
                             if let Some(window) = app_handle_menu.get_webview_window("main") {
                                 let _ = window.show();
