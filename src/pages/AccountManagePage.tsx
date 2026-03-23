@@ -159,10 +159,9 @@ export const AccountManagePage: React.FC = () => {
   }, [toast]);
 
   // 使用 useCallback 优化回调函数
-  const handleAddSuccess = useCallback(async () => {
+  const handleAddSuccess = useCallback(async (email: string) => {
     setShowAddForm(false);
-    // 添加账号后只更新本地列表，不获取订阅信息
-    await addAccountToList("");
+    await addAccountToList(email);
   }, [addAccountToList]);
 
   const handleEditSuccess = useCallback(async () => {

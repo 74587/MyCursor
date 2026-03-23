@@ -9,7 +9,7 @@ import Modal from "./Modal";
 
 interface AddAccountFormProps {
   isOpen: boolean;
-  onSuccess: () => void;
+  onSuccess: (email: string) => void;
   onCancel: () => void;
   onToast: (message: string, type: "success" | "error") => void;
 }
@@ -247,7 +247,7 @@ export const AddAccountForm = memo(({ isOpen, onSuccess, onCancel, onToast }: Ad
           await AccountService.editAccount(newEmail, undefined, undefined, undefined, undefined, undefined, undefined, parsedMachineIds);
         }
         onToast(result.message || "账户添加成功", "success");
-        onSuccess();
+        onSuccess(newEmail);
       } else {
         onToast(result.message, "error");
       }
