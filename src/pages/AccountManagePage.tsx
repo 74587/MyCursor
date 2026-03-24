@@ -216,13 +216,12 @@ export const AccountManagePage: React.FC = () => {
       );
 
       if (result.success) {
-        setToast({ message: "账户切换成功，正在启动 Cursor...", type: "success" });
         await loadAccounts();
-        // 自动启动 Cursor
         try {
           await invoke<{ success: boolean; message: string }>("launch_cursor");
-        } catch {
-          // 启动失败不影响切换结果
+          setToast({ message: "账户切换成功，Cursor 已启动", type: "success" });
+        } catch (launchErr) {
+          setToast({ message: `账户切换成功，但启动 Cursor 失败: ${launchErr}`, type: "error" });
         }
       } else {
         setToast({ message: result.message, type: "error" });

@@ -323,37 +323,113 @@ fn get_cursor_updater_path() -> Result<std::path::PathBuf, String> {
 }
 
 /// 启动 Cursor 应用
+///
+/// 优先使用用户设置的自定义路径，否则搜索多个默认安装位置。
 #[tauri::command]
 #[specta::specta]
-pub async fn launch_cursor() -> Result<serde_json::Value, String> {
+pub async fn launch_cursor(
+    service: State<'_, IdentityService>,
+) -> Result<serde_json::Value, String> {
+    use std::path::PathBuf;
+
+    let custom_path = service.get_custom_path();
+
     #[cfg(target_os = "windows")]
     {
-        let localappdata = std::env::var("LOCALAPPDATA").map_err(|e| e.to_string())?;
-        let cursor_exe = std::path::PathBuf::from(&localappdata)
-            .join("Programs").join("Cursor").join("Cursor.exe");
-        if cursor_exe.exists() {
-            std::process::Command::new(&cursor_exe)
-                .spawn()
-                .map_err(|e| e.to_string())?;
-            return Ok(serde_json::json!({"success": true, "message": "Cursor 已启动"}));
+        let mut candidates = Vec::new();
+
+        // 自定义路径优先：可能是 resources/app 目录或安装根目录
+        if let Some(ref custom) = custom_path {
+            let p = PathBuf::from(custom);
+            // 自定义路径本身就是 exe
+            if p.extension().map(|e| e == "exe").unwrap_or(false) {
+                candidates.push(p.clone());
+            }
+            // 自定义路径是目录，尝试向上查找 Cursor.exe
+            candidates.push(p.join("Cursor.exe"));
+            candidates.push(p.parent().unwrap_or(&p).join("Cursor.exe"));
+            // resources/app → resources → Cursor 根目录
+            if let Some(resources) = p.parent() {
+                if let Some(root) = resources.parent() {
+                    candidates.push(root.join("Cursor.exe"));
+                }
+            }
         }
+
+        // 默认安装路径
+        if let Ok(localappdata) = std::env::var("LOCALAPPDATA") {
+            candidates.push(PathBuf::from(&localappdata).join("Programs").join("Cursor").join("Cursor.exe"));
+            candidates.push(PathBuf::from(&localappdata).join("Programs").join("cursor").join("Cursor.exe"));
+            candidates.push(PathBuf::from(&localappdata).join("Cursor").join("Cursor.exe"));
+        }
+        candidates.push(PathBuf::from("C:\\Program Files\\Cursor\\Cursor.exe"));
+        candidates.push(PathBuf::from("C:\\Program Files (x86)\\Cursor\\Cursor.exe"));
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(home.join("AppData").join("Local").join("Programs").join("Cursor").join("Cursor.exe"));
+        }
+
+        for exe in &candidates {
+            if exe.exists() {
+                use std::os::windows::process::CommandExt;
+                const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+                std::process::Command::new(exe)
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .spawn()
+                    .map_err(|e| format!("启动 Cursor 失败: {}", e))?;
+                return Ok(serde_json::json!({"success": true, "message": "Cursor 已启动"}));
+            }
+        }
+
+        return Err("未找到 Cursor.exe，请检查是否已安装或设置自定义路径".to_string());
     }
     #[cfg(target_os = "macos")]
     {
-        let _ = std::process::Command::new("open")
+        if let Some(ref custom) = custom_path {
+            let p = PathBuf::from(custom);
+            // resources/app → Contents/Resources/app, 往上找 .app
+            let mut dir = p.as_path();
+            while let Some(parent) = dir.parent() {
+                if dir.extension().map(|e| e == "app").unwrap_or(false) {
+                    std::process::Command::new("open")
+                        .arg(dir)
+                        .spawn()
+                        .map_err(|e| format!("启动 Cursor 失败: {}", e))?;
+                    return Ok(serde_json::json!({"success": true, "message": "Cursor 已启动"}));
+                }
+                dir = parent;
+            }
+        }
+
+        std::process::Command::new("open")
             .arg("-a").arg("Cursor")
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("启动 Cursor 失败: {}", e))?;
         return Ok(serde_json::json!({"success": true, "message": "Cursor 已启动"}));
     }
     #[cfg(target_os = "linux")]
     {
-        let _ = std::process::Command::new("cursor")
+        if let Some(ref custom) = custom_path {
+            let p = PathBuf::from(custom);
+            let mut dir = p.as_path();
+            while let Some(parent) = dir.parent() {
+                let exe = dir.join("cursor");
+                if exe.exists() {
+                    std::process::Command::new(&exe)
+                        .spawn()
+                        .map_err(|e| format!("启动 Cursor 失败: {}", e))?;
+                    return Ok(serde_json::json!({"success": true, "message": "Cursor 已启动"}));
+                }
+                dir = parent;
+            }
+        }
+
+        std::process::Command::new("cursor")
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("启动 Cursor 失败: {}", e))?;
         return Ok(serde_json::json!({"success": true, "message": "Cursor 已启动"}));
     }
 
     #[allow(unreachable_code)]
-    Ok(serde_json::json!({"success": false, "message": "未找到 Cursor"}))
+    Err("未找到 Cursor".to_string())
 }
