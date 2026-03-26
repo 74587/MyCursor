@@ -2,6 +2,8 @@ import type { Dispatch, SetStateAction } from "react";
 import type { BackupInfo, MachineIds, ResetResult, RestoreResult } from "@/types/auth";
 import type { IdentityStep, WindowsUserInfo } from "./useIdentityPageState";
 
+export type { WindowsUserInfo };
+
 export interface IdentityPageActionsContext {
   customCursorPath: string;
   autoUpdateDisabled: boolean | null;
