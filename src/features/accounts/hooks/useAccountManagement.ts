@@ -124,20 +124,21 @@ export const useAccountManagement = () => {
 
       if (authResult.success && authResult.user_info?.account_info) {
         let authMeData: Record<string, unknown> = {};
-        if (account.workos_cursor_session_token) {
-          try {
-            const meResult = await AccountService.getAuthMe(account.workos_cursor_session_token);
-            if (meResult.success && meResult.data) {
-              authMeData = {
-                name: meResult.data.name || undefined,
-                sub: meResult.data.sub || undefined,
-                picture: meResult.data.picture || undefined,
-                user_id: meResult.data.id || undefined,
-              };
-            }
-          } catch {
-            // 静默失败
+        try {
+          const meResult = await AccountService.getAuthMe(
+            account.workos_cursor_session_token || "",
+            account.token
+          );
+          if (meResult.success && meResult.data) {
+            authMeData = {
+              name: meResult.data.name || undefined,
+              sub: meResult.data.sub || undefined,
+              picture: meResult.data.picture || undefined,
+              user_id: meResult.data.id || undefined,
+            };
           }
+        } catch {
+          // 静默失败
         }
 
         setAccountData((prevData) => {

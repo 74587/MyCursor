@@ -303,12 +303,22 @@ pub async fn set_close_behavior(minimize_to_tray: bool) -> Result<serde_json::Va
 
 /// 获取 auth/me 信息
 ///
-/// 使用 WorkOS Session Token 查询 /api/auth/me。
+/// 优先使用 WorkOS Session Token，若为空则回退到 access_token 构建 Cookie。
 #[tauri::command]
 #[specta::specta]
-pub async fn get_auth_me(session_token: String) -> Result<serde_json::Value, String> {
+pub async fn get_auth_me(session_token: String, access_token: Option<String>) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
-    let cookie = crate::infra::api::CursorApiClient::build_workos_cookie(&session_token);
+    let cookie = if !session_token.is_empty() {
+        crate::infra::api::CursorApiClient::build_workos_cookie(&session_token)
+    } else if let Some(ref at) = access_token {
+        if !at.is_empty() {
+            crate::infra::api::CursorApiClient::build_workos_cookie(at)
+        } else {
+            return Ok(serde_json::json!({"success": false, "message": "缺少有效的 Token"}));
+        }
+    } else {
+        return Ok(serde_json::json!({"success": false, "message": "缺少有效的 Token"}));
+    };
 
     let resp = client
         .get("https://www.cursor.com/api/auth/me")

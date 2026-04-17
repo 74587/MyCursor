@@ -195,16 +195,20 @@ export class AccountService {
     }
   }
 
-  /** 通过 session token 调用 /api/auth/me 获取用户详细信息 */
+  /** 通过 session token 或 access token 调用 /api/auth/me 获取用户详细信息 */
   static async getAuthMe(
-    sessionToken: string
+    sessionToken: string,
+    accessToken?: string
   ): Promise<{ success: boolean; data?: AuthMeResponse; message?: string }> {
     try {
       const result = await invoke<{
         success: boolean;
         data?: AuthMeResponse;
         message?: string;
-      }>("get_auth_me", { sessionToken });
+      }>("get_auth_me", {
+        sessionToken: sessionToken || "",
+        accessToken: accessToken || null,
+      });
       return result;
     } catch (error) {
       return {
