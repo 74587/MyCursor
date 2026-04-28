@@ -197,18 +197,36 @@ pub async fn check_user_authorization(token: String) -> Result<crate::domain::au
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        // 优先使用 individualMembershipType（真实会员类型，如 ultra），
-        // 没有时回退到 membershipType（对所有付费用户可能返回 pro）
+        // 订阅类型优先规则：
+        // 1. Team 账号优先标记为 team
+        // 2. 其次使用 membershipType
+        // 3. 再回退到 individualMembershipType
+        // 4. 最后尝试 subscription.membershipType
         let subscription = data.get("subscription");
-        let subscription_type = data.get("individualMembershipType")
+        let is_team_member = data.get("isTeamMember")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let team_membership_type = data.get("teamMembershipType")
             .and_then(|v| v.as_str())
-            .filter(|s| !s.is_empty())
-            .or_else(|| subscription
-                .and_then(|s| s.get("membershipType"))
-                .and_then(|v| v.as_str()))
-            .or_else(|| data.get("membershipType")
-                .and_then(|v| v.as_str()))
-            .map(|s| s.to_string());
+            .filter(|s| !s.is_empty());
+        let subscription_type = if is_team_member || team_membership_type.is_some() {
+            Some(match team_membership_type {
+                Some(team_type) => format!("team:{}", team_type),
+                None => "team".to_string(),
+            })
+        } else {
+            data.get("membershipType")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .or_else(|| data.get("individualMembershipType")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty()))
+                .or_else(|| subscription
+                    .and_then(|s| s.get("membershipType"))
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty()))
+                .map(|s| s.to_string())
+        };
 
         let subscription_status = subscription
             .and_then(|s| s.get("status"))

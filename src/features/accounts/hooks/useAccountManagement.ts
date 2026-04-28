@@ -4,6 +4,7 @@ import { ConfigService } from "@/services/configService";
 import type { AccountListResult, AccountInfo } from "@/types/account";
 import { performanceMonitor } from "@/utils/performance";
 import { safeStorage } from "@/utils/safeStorage";
+import { formatSubscriptionTypeLabel } from "@/features/accounts/utils/subscriptionType";
 
 export const useAccountManagement = () => {
   const [accountData, setAccountData] = useState<AccountListResult | null>(null);
@@ -526,20 +527,12 @@ export const useAccountManagement = () => {
       if (subscriptionType) types.add(subscriptionType);
     }
 
-    const labelMap: Record<string, string> = {
-      pro: "Pro",
-      ultra: "Ultra",
-      business: "Business",
-      free_trial: "Trial",
-      free: "Free",
-    };
-
-    for (const type of Array.from(types).sort()) {
-      options.push({ value: type, label: labelMap[type] || type });
+    for (const type of Array.from(types).sort((a, b) => a.localeCompare(b))) {
+      options.push({ value: type, label: formatSubscriptionTypeLabel(type) });
     }
 
     if (accountData.accounts.some((account) => !account.subscription_type) && !types.has("free")) {
-      options.push({ value: "free", label: "Free" });
+      options.push({ value: "free", label: formatSubscriptionTypeLabel("free") });
     }
 
     return options;

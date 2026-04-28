@@ -228,27 +228,78 @@ pub async fn get_backup_directory_info(
 #[tauri::command]
 #[specta::specta]
 pub async fn get_auto_update_status() -> Result<serde_json::Value, String> {
-    let updater_path = get_cursor_updater_path()?;
-    let exists = updater_path.exists();
-    Ok(serde_json::json!({
-        "disabled": !exists,
-        "path": updater_path.to_string_lossy(),
-        "exists": exists
-    }))
+    #[cfg(target_os = "windows")]
+    {
+        let updater_path = get_cursor_updater_target_path()?;
+        let updater_blocked = updater_path.is_file();
+        let updater_exists = updater_path.exists() || updater_path.with_extension("bak").exists();
+
+        Ok(serde_json::json!({
+            "disabled": updater_blocked,
+            "path": updater_path.to_string_lossy(),
+            "exists": updater_exists,
+            "updater_blocked": updater_blocked,
+        }))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let updater_path = get_cursor_updater_path()?;
+        let exists = updater_path.exists();
+        Ok(serde_json::json!({
+            "disabled": !exists,
+            "path": updater_path.to_string_lossy(),
+            "exists": exists
+        }))
+    }
 }
 
 /// 禁用自动更新
 #[tauri::command]
 #[specta::specta]
 pub async fn disable_auto_update() -> Result<serde_json::Value, String> {
-    let updater_path = get_cursor_updater_path()?;
-    if updater_path.exists() {
-        let disabled_path = updater_path.with_extension("disabled");
-        std::fs::rename(&updater_path, &disabled_path).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    {
+        let updater_path = get_cursor_updater_target_path()?;
+        let updater_backup_path = updater_path.with_extension("bak");
+        let mut details = Vec::new();
+
+        if updater_path.is_dir() {
+            if updater_backup_path.exists() {
+                if updater_backup_path.is_dir() {
+                    std::fs::remove_dir_all(&updater_backup_path).map_err(|e| e.to_string())?;
+                } else {
+                    std::fs::remove_file(&updater_backup_path).map_err(|e| e.to_string())?;
+                }
+            }
+            std::fs::rename(&updater_path, &updater_backup_path).map_err(|e| e.to_string())?;
+            details.push(format!("已备份更新器目录: {}", updater_backup_path.display()));
+        }
+
+        if !updater_path.exists() {
+            std::fs::write(&updater_path, b"").map_err(|e| e.to_string())?;
+            details.push(format!("已创建更新器占位文件: {}", updater_path.display()));
+        }
+
         log_info!("已禁用自动更新");
-        Ok(serde_json::json!({"success": true, "message": "已禁用自动更新"}))
-    } else {
-        Ok(serde_json::json!({"success": true, "message": "更新器不存在，无需禁用"}))
+        Ok(serde_json::json!({
+            "success": true,
+            "message": "已禁用自动更新",
+            "details": details,
+        }))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let updater_path = get_cursor_updater_path()?;
+        if updater_path.exists() {
+            let disabled_path = updater_path.with_extension("disabled");
+            std::fs::rename(&updater_path, &disabled_path).map_err(|e| e.to_string())?;
+            log_info!("已禁用自动更新");
+            Ok(serde_json::json!({"success": true, "message": "已禁用自动更新"}))
+        } else {
+            Ok(serde_json::json!({"success": true, "message": "更新器不存在，无需禁用"}))
+        }
     }
 }
 
@@ -256,14 +307,41 @@ pub async fn disable_auto_update() -> Result<serde_json::Value, String> {
 #[tauri::command]
 #[specta::specta]
 pub async fn enable_auto_update() -> Result<serde_json::Value, String> {
-    let updater_path = get_cursor_updater_path()?;
-    let disabled_path = updater_path.with_extension("disabled");
-    if disabled_path.exists() {
-        std::fs::rename(&disabled_path, &updater_path).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    {
+        let updater_path = get_cursor_updater_target_path()?;
+        let updater_backup_path = updater_path.with_extension("bak");
+        let mut details = Vec::new();
+
+        if updater_path.is_file() {
+            std::fs::remove_file(&updater_path).map_err(|e| e.to_string())?;
+            details.push(format!("已移除更新器占位文件: {}", updater_path.display()));
+        }
+
+        if updater_backup_path.exists() {
+            std::fs::rename(&updater_backup_path, &updater_path).map_err(|e| e.to_string())?;
+            details.push(format!("已恢复更新器目录: {}", updater_path.display()));
+        }
+
         log_info!("已启用自动更新");
-        Ok(serde_json::json!({"success": true, "message": "已启用自动更新"}))
-    } else {
-        Ok(serde_json::json!({"success": true, "message": "更新器未被禁用"}))
+        Ok(serde_json::json!({
+            "success": true,
+            "message": "已启用自动更新",
+            "details": details,
+        }))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let updater_path = get_cursor_updater_path()?;
+        let disabled_path = updater_path.with_extension("disabled");
+        if disabled_path.exists() {
+            std::fs::rename(&disabled_path, &updater_path).map_err(|e| e.to_string())?;
+            log_info!("已启用自动更新");
+            Ok(serde_json::json!({"success": true, "message": "已启用自动更新"}))
+        } else {
+            Ok(serde_json::json!({"success": true, "message": "更新器未被禁用"}))
+        }
     }
 }
 
@@ -299,12 +377,18 @@ pub async fn debug_windows_cursor_paths() -> Result<Vec<String>, String> {
     Ok(info)
 }
 
+/// 获取 Windows 上的 cursor-updater 目标路径（目录/占位文件同名）
+#[cfg(target_os = "windows")]
+fn get_cursor_updater_target_path() -> Result<std::path::PathBuf, String> {
+    let localappdata = std::env::var("LOCALAPPDATA").map_err(|e| e.to_string())?;
+    Ok(std::path::PathBuf::from(localappdata).join("cursor-updater"))
+}
+
 /// 获取 cursor-updater 路径
 fn get_cursor_updater_path() -> Result<std::path::PathBuf, String> {
     #[cfg(target_os = "windows")]
     {
-        let localappdata = std::env::var("LOCALAPPDATA").map_err(|e| e.to_string())?;
-        Ok(std::path::PathBuf::from(localappdata).join("cursor-updater").join("cursor-updater.exe"))
+        Ok(get_cursor_updater_target_path()?.join("cursor-updater.exe"))
     }
     #[cfg(target_os = "macos")]
     {

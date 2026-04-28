@@ -486,7 +486,7 @@ pub async fn open_cursor_dashboard(
         }));
     }
 
-    log_info!("打开 Cursor 主页...");
+    log_info!("打开 Cursor 主页（隐私模式）...");
 
     if let Some(w) = app.get_webview_window("cursor_dashboard") {
         let _ = w.close();
@@ -504,13 +504,19 @@ pub async fn open_cursor_dashboard(
     )
     .title("Cursor - 主页")
     .inner_size(1200.0, 800.0)
+    .incognito(true)
     .on_page_load(move |webview, payload| {
         if injected_clone.load(std::sync::atomic::Ordering::Relaxed) {
             return;
         }
 
+        match payload.event() {
+            tauri::webview::PageLoadEvent::Finished => {}
+            _ => return,
+        }
+
         let url = payload.url().to_string();
-        if !url.contains("cursor.com") {
+        if !(url.starts_with("https://cursor.com") || url.starts_with("https://www.cursor.com")) {
             return;
         }
 
@@ -518,9 +524,15 @@ pub async fn open_cursor_dashboard(
 
         let script = format!(
             r#"(function(){{
-                document.cookie="WorkosCursorSessionToken={}; domain=.cursor.com; path=/; secure; max-age=31536000";
-                document.cookie="NEXT_LOCALE=zh-CN; domain=.cursor.com; path=/; max-age=31536000";
-                window.location.href="https://cursor.com/dashboard";
+                document.cookie = "WorkosCursorSessionToken={}; domain=.cursor.com; path=/; secure; max-age=31536000";
+                document.cookie = "NEXT_LOCALE=zh-CN; domain=.cursor.com; path=/; max-age=31536000";
+
+                console.log("✅ Cookie 设置成功！");
+                console.log("🔄 正在跳转到 Dashboard...");
+
+                setTimeout(function() {{
+                    window.location.href = "https://cursor.com/dashboard";
+                }}, 1000);
             }})();"#,
             token
         );
@@ -528,7 +540,7 @@ pub async fn open_cursor_dashboard(
     })
     .build()
     {
-        Ok(_) => Ok(serde_json::json!({"success": true, "message": "已打开 Cursor 主页"})),
+        Ok(_) => Ok(serde_json::json!({"success": true, "message": "已以隐私模式打开 Cursor 主页"})),
         Err(e) => Ok(serde_json::json!({"success": false, "message": format!("打开失败: {}", e)})),
     }
 }

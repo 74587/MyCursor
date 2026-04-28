@@ -29,19 +29,20 @@ impl CursorApiClient {
 
     // === Cookie 构建 ===
 
-    /// 构建 WorkOS Cookie（简单版本，直接使用传入的 token）
+    /// 构建 WorkOS Cookie
+    ///
+    /// 规则：
+    /// - 如果传入的是完整的 WorkosCursorSessionToken（包含 `::` 或 `%3A%3A`），直接原样使用
+    /// - 如果传入的是 access token，则按旧兼容逻辑拼接默认前缀
     pub fn build_workos_cookie(token: &str) -> String {
-        let token_part = if token.contains("%3A%3A") {
-            token.split("%3A%3A").nth(1).unwrap_or(token)
-        } else if token.contains("::") {
-            token.split("::").nth(1).unwrap_or(token)
+        if token.contains("::") || token.contains("%3A%3A") {
+            format!("WorkosCursorSessionToken={}", token)
         } else {
-            token
-        };
-        format!(
-            "WorkosCursorSessionToken=user_01000000000000000000000000::{}",
-            token_part
-        )
+            format!(
+                "WorkosCursorSessionToken=user_01000000000000000000000000::{}",
+                token
+            )
+        }
     }
 
     /// 构建 WorkOS Cookie（优先从账号列表查找保存的 Session Token）

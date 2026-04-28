@@ -2,6 +2,7 @@ import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components";
 import type { AccountInfo } from "@/types/account";
+import { formatSubscriptionTypeLabel, getSubscriptionVisualStyle } from "@/features/accounts/utils/subscriptionType";
 
 interface AccountCardProps {
   account: AccountInfo;
@@ -145,58 +146,16 @@ export const AccountCard = memo(
         );
       }
 
-      const subType = (account.subscription_type || "free").toLowerCase();
-      const daysRemaining =
-        account.trial_days_remaining !== undefined ? ` - ${account.trial_days_remaining}天` : "";
-
-      const styleMap: Record<string, { bg: string; color: string; icon: string; label: string }> = {
-        pro: { bg: "rgba(168, 85, 247, 0.15)", color: "#9333ea", icon: "crown", label: "Pro" },
-        pro_plus: {
-          bg: "rgba(168, 85, 247, 0.2)",
-          color: "#7c3aed",
-          icon: "crown",
-          label: "Pro+",
-        },
-        ultra: {
-          bg: "rgba(168, 85, 247, 0.2)",
-          color: "#7c3aed",
-          icon: "crown",
-          label: "Ultra",
-        },
-        business: {
-          bg: "rgba(168, 85, 247, 0.15)",
-          color: "#6d28d9",
-          icon: "crown",
-          label: "Business",
-        },
-        free_trial: {
-          bg: "rgba(74, 137, 220, 0.15)",
-          color: "var(--primary-color)",
-          icon: "gift",
-          label: `Trial${daysRemaining}`,
-        },
-        free: {
-          bg: "var(--bg-secondary)",
-          color: "var(--text-secondary)",
-          icon: "free",
-          label: "Free",
-        },
-      };
-
-      const style = styleMap[subType] || {
-        bg: "rgba(74, 137, 220, 0.1)",
-        color: "var(--primary-color)",
-        icon: "bolt",
-        label: account.subscription_type || "Free",
-      };
+      const style = getSubscriptionVisualStyle(account.subscription_type);
+      const label = formatSubscriptionTypeLabel(account.subscription_type, account.trial_days_remaining);
 
       return (
         <span
           className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
           style={{ backgroundColor: style.bg, color: style.color }}
         >
-          <Icon name={style.icon as never} size={12} style={{ marginRight: "2px" }} />
-          {style.label}
+          <Icon name={style.icon} size={12} style={{ marginRight: "2px" }} />
+          {label}
         </span>
       );
     }, [account.subscription_type, account.trial_days_remaining]);
