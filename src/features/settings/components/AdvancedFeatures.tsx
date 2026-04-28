@@ -1,6 +1,5 @@
-import React from "react";
 import { Card, Button, Input, Alert, Icon } from "@/components";
-import type { TelemetryPatchStatus } from "./AdvancedFeatures";
+import type { TelemetryPatchStatus } from "../types/telemetryPatchStatus";
 
 export interface AdvancedWindowsUserInfo {
   username: string;
@@ -149,7 +148,7 @@ export function AdvancedFeatures({
 
           {telemetryStatus?.details && telemetryStatus.details.length > 0 && (
             <div className="space-y-2">
-              {telemetryStatus.details.map((detail, index) => (
+              {telemetryStatus.details.map((detail: string, index: number) => (
                 <p key={`${detail}-${index}`} className="text-xs flex items-start gap-2" style={{ color: "var(--text-secondary)" }}>
                   <Icon name="info" size={14} />
                   <span>{detail}</span>

@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { CursorService } from "@/services/cursorService";
 import type { BackupInfo } from "@/types/auth";
-import type { IdentityPageActionsContext, WindowsUserInfo } from "./identityPageActionTypes.ts";
+import type { IdentityPageActionsContext } from "./identityPageActionTypes.ts";
 
 export function useIdentityPageDataActions({
   selectedBackup,

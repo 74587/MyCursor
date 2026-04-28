@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { TelemetryPatchStatus } from "../components/AdvancedFeatures";
+import type { TelemetryPatchStatus } from "../types/telemetryPatchStatus";
 import type { WindowsUserInfo } from "@/features/identity/hooks/useIdentityPageState";
 
 export function useSettingsPageState() {
