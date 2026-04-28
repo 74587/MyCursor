@@ -9,9 +9,10 @@ const MachineIdPage = lazy(() => import("@/features/identity/IdentityPage"));
 const AccountsPage = lazy(() => import("@/features/accounts/AccountsPage"));
 const UsageStatsPage = lazy(() => import("@/features/analytics/AnalyticsPage"));
 const SeamlessPage = lazy(() => import("@/features/seamless/SeamlessPage"));
+const AdvancedFeaturesPage = lazy(() => import("@/features/advanced/AdvancedFeaturesPage"));
 const SettingsPage = lazy(() => import("@/features/settings/SettingsPage"));
 
-type PageType = "machineId" | "account" | "seamless" | "usage" | "settings";
+type PageType = "machineId" | "account" | "seamless" | "usage" | "advanced" | "settings";
 
 function App() {
   const [currentPage, setCurrentPage] = useState<PageType>("machineId");
@@ -175,6 +176,18 @@ function App() {
           </button>
 
           <button
+            onClick={() => setCurrentPage("advanced")}
+            className={getNavButtonClass(currentPage === "advanced")}
+            style={getNavButtonStyle(currentPage === "advanced")}
+            title="高级功能"
+          >
+            <Icon name="power" size={isSidebarCollapsed ? 24 : 20} />
+            {!isSidebarCollapsed && (
+              <span className="whitespace-nowrap">高级功能</span>
+            )}
+          </button>
+
+          <button
             onClick={() => setCurrentPage("settings")}
             className={getNavButtonClass(currentPage === "settings")}
             style={getNavButtonStyle(currentPage === "settings")}
@@ -218,6 +231,7 @@ function App() {
               {currentPage === "account" && <AccountsPage />}
               {currentPage === "seamless" && <SeamlessPage />}
               {currentPage === "usage" && <UsageStatsPage />}
+              {currentPage === "advanced" && <AdvancedFeaturesPage />}
               {currentPage === "settings" && <SettingsPage />}
             </div>
           </Suspense>

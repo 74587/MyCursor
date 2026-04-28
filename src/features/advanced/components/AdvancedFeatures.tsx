@@ -1,5 +1,5 @@
 import { Card, Button, Input, Alert, Icon } from "@/components";
-import type { TelemetryPatchStatus } from "../types/telemetryPatchStatus";
+import type { TelemetryPatchStatus } from "@/features/settings/types/telemetryPatchStatus";
 
 export interface AdvancedWindowsUserInfo {
   username: string;
@@ -65,13 +65,6 @@ export function AdvancedFeatures({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
-          <Icon name="power" size={20} />
-          高级功能
-        </h3>
-      </div>
-
       <Card>
         <Card.Header>
           <h4 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
@@ -238,21 +231,11 @@ export function AdvancedFeatures({
         </Card.Header>
         <Card.Content>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Button
-              variant="ghost"
-              onClick={onGetLogPath}
-              className="h-16"
-              icon={<Icon name="settings" size={18} />}
-            >
+            <Button variant="ghost" onClick={onGetLogPath} className="h-16" icon={<Icon name="settings" size={18} />}>
               获取日志路径
             </Button>
 
-            <Button
-              variant="ghost"
-              onClick={onOpenLogDirectory}
-              className="h-16"
-              icon={<Icon name="download" size={18} />}
-            >
+            <Button variant="ghost" onClick={onOpenLogDirectory} className="h-16" icon={<Icon name="download" size={18} />}>
               打开日志目录
             </Button>
           </div>
@@ -267,12 +250,7 @@ export function AdvancedFeatures({
                 <Icon name="user" size={18} />
                 同步到其他用户
               </h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onDetectWindowsUsers}
-                icon={<Icon name="search" size={14} />}
-              >
+              <Button variant="ghost" size="sm" onClick={onDetectWindowsUsers} icon={<Icon name="search" size={14} />}>
                 检测用户
               </Button>
             </div>
