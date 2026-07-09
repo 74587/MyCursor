@@ -30,6 +30,8 @@ pub struct AggregatedUsageData {
     pub total_cache_write_tokens: String,
     pub total_cache_read_tokens: String,
     pub total_cost_cents: f64,
+    #[serde(default)]
+    pub total_request_cost: Option<f64>,
 }
 
 /// 单个模型的用量数据
@@ -41,6 +43,8 @@ pub struct ModelUsage {
     pub cache_write_tokens: String,
     pub cache_read_tokens: String,
     pub total_cents: f64,
+    #[serde(default)]
+    pub request_cost: Option<f64>,
 }
 
 /// 用量请求参数

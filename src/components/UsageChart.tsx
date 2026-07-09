@@ -67,12 +67,12 @@ export const UsageChart: React.FC<UsageChartProps> = memo(({
       const dataPoint: any = {
         timestamp: snapshot.timestamp,
         time: formatTimestamp(snapshot.timestamp),
-        totalCost: snapshot.total_cost / 100, // 转为美元
+        totalCost: snapshot.total_cost / 100,
       };
 
       // 添加各模型费用
       modelNames.forEach((modelName) => {
-        dataPoint[modelName] = (snapshot.models[modelName] || 0) / 100; // 转为美元
+        dataPoint[modelName] = (snapshot.models[modelName] || 0) / 100;
       });
 
       return dataPoint;

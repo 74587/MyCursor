@@ -5,6 +5,7 @@ export interface ModelUsage {
   cache_write_tokens: string;
   cache_read_tokens: string;
   total_cents: number;
+  request_cost?: number;
 }
 
 export interface AggregatedUsageData {
@@ -14,6 +15,7 @@ export interface AggregatedUsageData {
   total_cache_write_tokens: string;
   total_cache_read_tokens: string;
   total_cost_cents: number;
+  total_request_cost?: number;
 }
 
 export interface UsageRequest {

@@ -122,7 +122,7 @@ export class ConfigService {
       if (result.success && result.data) {
         return {
           success: true,
-          data: JSON.parse(result.data),
+          data: typeof result.data === 'string' ? JSON.parse(result.data) : result.data,
         };
       }
       return result;
@@ -222,7 +222,7 @@ export class ConfigService {
       if (result.success && result.data) {
         return {
           success: true,
-          data: JSON.parse(result.data),
+          data: typeof result.data === 'string' ? JSON.parse(result.data) : result.data,
         };
       }
       return result;

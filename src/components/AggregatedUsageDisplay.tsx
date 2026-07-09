@@ -133,6 +133,38 @@ export const AggregatedUsageDisplay: React.FC<AggregatedUsageDisplayProps> = mem
         </div>
       </div>
 
+      {aggregatedUsage.total_request_cost != null && (
+        <div className={`rounded-lg ${isCompact ? "p-2" : "p-3"}`} style={{
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(168, 85, 247, 0.08))',
+          border: '1px solid rgba(99, 102, 241, 0.2)',
+        }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs font-medium tracking-wide uppercase" style={{ color: '#6366f1' }}>
+                额度使用
+              </div>
+              <div className={`mt-1 font-semibold ${isCompact ? "text-md" : "text-lg"}`} style={{ color: '#4338ca' }}>
+                {aggregatedUsage.total_request_cost} / 500
+              </div>
+            </div>
+            <div className="flex-1 ml-4 max-w-[200px]">
+              <div className="w-full rounded-full h-2" style={{ backgroundColor: 'rgba(99, 102, 241, 0.15)' }}>
+                <div
+                  className="rounded-full h-2 transition-all duration-500"
+                  style={{
+                    width: `${Math.min((aggregatedUsage.total_request_cost / 500) * 100, 100)}%`,
+                    backgroundColor: aggregatedUsage.total_request_cost > 400 ? '#ef4444' : '#6366f1',
+                  }}
+                />
+              </div>
+              <div className="text-xs mt-1 text-right" style={{ color: 'var(--text-tertiary)' }}>
+                {((aggregatedUsage.total_request_cost / 500) * 100).toFixed(1)}%
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Usage Details Modal */}
       {token && (

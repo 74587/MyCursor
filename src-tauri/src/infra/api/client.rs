@@ -122,6 +122,7 @@ impl CursorApiClient {
                         cache_write_tokens: agg.get("cacheWriteTokens").and_then(|v| v.as_str()).unwrap_or("0").to_string(),
                         cache_read_tokens: agg.get("cacheReadTokens").and_then(|v| v.as_str()).unwrap_or("0").to_string(),
                         total_cents: agg.get("totalCents").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                        request_cost: agg.get("requestCost").and_then(|v| v.as_f64()),
                     });
                 }
             }
@@ -134,6 +135,7 @@ impl CursorApiClient {
             total_cache_write_tokens: json_data.get("totalCacheWriteTokens").and_then(|v| v.as_str()).unwrap_or("0").to_string(),
             total_cache_read_tokens: json_data.get("totalCacheReadTokens").and_then(|v| v.as_str()).unwrap_or("0").to_string(),
             total_cost_cents: json_data.get("totalCostCents").and_then(|v| v.as_f64()).unwrap_or(0.0),
+            total_request_cost: json_data.get("totalRequestCost").and_then(|v| v.as_f64()),
         }))
     }
 
