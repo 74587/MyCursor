@@ -79,6 +79,44 @@ impl CursorApiClient {
 
     // === 用量 API ===
 
+    /// 获取当前计费周期
+    ///
+    /// 调用 Cursor Dashboard API 获取订阅的开始/结束时间戳（毫秒）。
+    pub async fn get_current_billing_cycle(
+        &self,
+        cookie: &str,
+    ) -> Result<Option<(u64, u64)>, AppError> {
+        let mut headers = Self::build_dashboard_headers()?;
+        headers.insert("Cookie", cookie.parse().map_err(|_| AppError::Internal("cookie error".into()))?);
+
+        let resp = self.http
+            .post("https://cursor.com/api/dashboard/get-current-billing-cycle")
+            .headers(headers)
+            .json(&serde_json::json!({}))
+            .timeout(std::time::Duration::from_secs(20))
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            return Ok(None);
+        }
+
+        let text = resp.text().await?;
+        let json_data: serde_json::Value = serde_json::from_str(&text)?;
+
+        let start = json_data.get("startDateEpochMillis")
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<u64>().ok());
+        let end = json_data.get("endDateEpochMillis")
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<u64>().ok());
+
+        match (start, end) {
+            (Some(s), Some(e)) => Ok(Some((s, e))),
+            _ => Ok(None),
+        }
+    }
+
     /// 获取聚合用量数据
     pub async fn get_aggregated_usage(
         &self,

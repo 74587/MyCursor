@@ -221,6 +221,7 @@ pub fn run() {
             commands::account::sync_account_to_user,
 
             // === Analytics 命令 ===
+            commands::analytics::get_current_billing_cycle,
             commands::analytics::save_usage_data_cache,
             commands::analytics::load_usage_data_cache,
             commands::analytics::clear_usage_data,

@@ -110,6 +110,29 @@ pub async fn clear_account_cache() -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({"success": true, "message": "账号缓存已清除"}))
 }
 
+/// 获取当前计费周期（自动获取订阅的开始/结束时间戳）
+#[tauri::command]
+#[specta::specta]
+pub async fn get_current_billing_cycle(token: String) -> Result<serde_json::Value, String> {
+    let client = crate::infra::api::CursorApiClient::new();
+    let cookie = crate::infra::api::CursorApiClient::build_workos_cookie(&token);
+    match client.get_current_billing_cycle(&cookie).await {
+        Ok(Some((start, end))) => Ok(serde_json::json!({
+            "success": true,
+            "startDate": start,
+            "endDate": end
+        })),
+        Ok(None) => Ok(serde_json::json!({
+            "success": false,
+            "message": "无法获取计费周期"
+        })),
+        Err(e) => Ok(serde_json::json!({
+            "success": false,
+            "message": format!("获取计费周期失败: {}", e)
+        })),
+    }
+}
+
 /// 获取指定时间段的用量数据
 #[tauri::command]
 #[specta::specta]

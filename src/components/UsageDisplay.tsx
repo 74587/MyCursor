@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { DateRange } from "../types/usage";
 import { AggregatedUsageDisplay } from "./AggregatedUsageDisplay";
 import { AggregatedBreakdown } from "./AggregatedBreakdown";
@@ -31,29 +32,56 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false); // 防止重复刷新
   const { config } = useTheme(); // 获取主题配置
 
-  const [dateRange, setDateRange] = useState<DateRange>(() => {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
-
-    console.log("📅 初始化日期范围:", {
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-    });
-
-    return { startDate, endDate };
-  });
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [billingCycleLoading, setBillingCycleLoading] = useState(true);
+  const [billingCycleError, setBillingCycleError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [shouldAutoRefresh, setShouldAutoRefresh] = useState(false);
 
-  // 组件挂载时加载本地数据
+  // 组件挂载时先获取计费周期，再加载本地数据
   useEffect(() => {
-    if (token && email) {
+    if (!token) return;
+
+    const fetchBillingCycle = async () => {
+      setBillingCycleLoading(true);
+      setBillingCycleError(null);
+      try {
+        const result = await invoke<any>("get_current_billing_cycle", { token });
+        if (result.success && result.startDate && result.endDate) {
+          setDateRange({
+            startDate: new Date(result.startDate),
+            endDate: new Date(result.endDate),
+          });
+        } else {
+          setBillingCycleError(result.message || "无法获取计费周期");
+          const endDate = new Date();
+          const startDate = new Date();
+          startDate.setDate(startDate.getDate() - 30);
+          setDateRange({ startDate, endDate });
+        }
+      } catch (err) {
+        console.error("获取计费周期失败:", err);
+        setBillingCycleError("获取计费周期失败，使用默认 30 天");
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+        setDateRange({ startDate, endDate });
+      } finally {
+        setBillingCycleLoading(false);
+      }
+    };
+
+    fetchBillingCycle();
+  }, [token]);
+
+  // 计费周期就绪后加载本地数据
+  useEffect(() => {
+    if (token && email && dateRange) {
       loadFromLocal();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, email]);
+  }, [token, email, dateRange]);
 
   // 手动刷新：从API获取新数据并保存到本地
   const handleManualRefresh = useCallback(async () => {
@@ -73,6 +101,11 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
       return;
     }
 
+    if (!dateRange) {
+      setError("计费周期尚未加载完成");
+      return;
+    }
+
     performanceMonitor.start('UsageDisplay_manualRefresh');
     console.log("🔄 用户手动刷新 - 从API获取新数据");
     setIsRefreshing(true);
@@ -82,7 +115,6 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
     try {
       const { UsageService } = await import("../services/usageService");
       const { ConfigService } = await import("../services/configService");
-      const { invoke } = await import("@tauri-apps/api/core");
 
       // 从API获取聚合数据
       const result = await UsageService.getUsageForPeriod(
@@ -148,8 +180,7 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
         try {
           const eventsResponse: any = await invoke("get_events_v2", {
             token,
-            // 与 get_aggregated_usage / 刷新聚合用量 的 teamId 一致（个人用量用 -1）
-            teamId: "-1",
+            teamId: "0",
             startDate: dateRange.startDate.toISOString(),
             endDate: dateRange.endDate.toISOString(),
           });
@@ -316,17 +347,6 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
 
       if (hasUsageData && usageResult.data) {
         console.log("✅ 成功从本地加载聚合用量数据");
-        console.log("📅 保存的日期范围:", {
-          start: usageResult.data.start_date,
-          end: usageResult.data.end_date
-        });
-        
-        // 恢复保存的日期
-        setDateRange({
-          startDate: new Date(usageResult.data.start_date),
-          endDate: new Date(usageResult.data.end_date),
-        });
-        // 恢复保存的用量数据
         setLocalUsageData(usageResult.data.data);
         setError(null);
         
@@ -348,48 +368,8 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
     }
   };
 
-  // 日期变化时只保存，不获取数据
-  const handleDateRangeChange = useCallback(async (newDateRange: DateRange) => {
-    setDateRange(newDateRange);
-    console.log("📅 日期范围已更新并保存");
-
-    // 保存新的日期到本地（保持原有数据）
-    if (email && localUsageData) {
-      try {
-        const { ConfigService } = await import("../services/configService");
-        await ConfigService.saveUsageData(
-          email,
-          token,
-          newDateRange.startDate.toISOString(),
-          newDateRange.endDate.toISOString(),
-          localUsageData
-        );
-        console.log("💾 日期已保存，请点击刷新获取该时间段的数据");
-      } catch (error) {
-        console.error("保存日期失败:", error);
-      }
-    }
-  }, [email, token, localUsageData]);
-
-  // Preset period change function - commented out as it's not currently used
-  // const handlePresetPeriodChange = async (period: string) => {
-  //   const endDate = new Date();
-  //   const startDate = new Date();
-  //   switch (period) {
-  //     case "7days":
-  //       startDate.setDate(startDate.getDate() - 7);
-  //       break;
-  //     case "30days":
-  //       startDate.setDate(startDate.getDate() - 30);
-  //       break;
-  //     default:
-  //       startDate.setDate(startDate.getDate() - 30);
-  //   }
-  //   await handleDateRangeChange({ startDate, endDate });
-  // };
-
   const formatDate = useCallback((date: Date): string => {
-    return date.toISOString().split("T")[0];
+    return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
   }, []);
 
   // 检测是否开启了自定义背景或透明主题
@@ -536,84 +516,32 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
           </div>
         </div>
 
-        {/* Time Period Selection - 只保留自定义 */}
-        <div className="mb-4 space-y-3">
-          <div>
-            <label className="block mb-2 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-              时间段选择
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  开始日期
-                </label>
-                <input
-                  type="date"
-                  value={formatDate(dateRange.startDate)}
-                  onChange={(e) => {
-                    const newStartDate = new Date(e.target.value);
-                    handleDateRangeChange({
-                      startDate: newStartDate,
-                      endDate: dateRange.endDate,
-                    });
-                  }}
-                  className="block w-full mt-1 rounded-md sm:text-sm"
-                  style={{
-                    border: '1px solid var(--border-primary)',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    padding: '8px',
-                    transition: 'all var(--transition-duration) ease',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.outline = 'none';
-                    e.currentTarget.style.borderColor = 'var(--primary-color)';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(74, 137, 220, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border-primary)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                  aria-label="开始日期"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  结束日期
-                </label>
-                <input
-                  type="date"
-                  value={formatDate(dateRange.endDate)}
-                  onChange={(e) => {
-                    const newEndDate = new Date(e.target.value);
-                    handleDateRangeChange({
-                      startDate: dateRange.startDate,
-                      endDate: newEndDate,
-                    });
-                  }}
-                  className="block w-full mt-1 rounded-md sm:text-sm"
-                  style={{
-                    border: '1px solid var(--border-primary)',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    padding: '8px',
-                    transition: 'all var(--transition-duration) ease',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.outline = 'none';
-                    e.currentTarget.style.borderColor = 'var(--primary-color)';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(74, 137, 220, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border-primary)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                  aria-label="结束日期"
-                />
-              </div>
-            </div>
+        {/* 计费周期显示 */}
+        {billingCycleLoading && (
+          <div className="mb-4 flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <Icon name="loading" size={14} className="animate-spin" />
+            正在获取计费周期...
           </div>
-        </div>
+        )}
+        {!billingCycleLoading && dateRange && (
+          <div
+            className="mb-4 flex items-center gap-2 px-3 py-2 rounded-md text-sm"
+            style={{
+              backgroundColor: billingCycleError ? 'rgba(245, 158, 11, 0.1)' : 'rgba(74, 137, 220, 0.08)',
+              color: billingCycleError ? 'var(--text-secondary)' : 'var(--primary-color)',
+            }}
+          >
+            <Icon name="calendar" size={14} />
+            <span>
+              当前计费周期：{formatDate(dateRange.startDate)} ~ {formatDate(dateRange.endDate)}
+            </span>
+            {billingCycleError && (
+              <span style={{ color: 'var(--text-tertiary)', fontSize: '12px' }}>
+                （{billingCycleError}）
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Loading State */}
         {loading && (

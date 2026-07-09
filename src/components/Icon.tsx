@@ -48,6 +48,7 @@ import {
   IconAppWindow,
   IconArrowBarDown,
   IconPower,
+  IconCalendar,
 } from '@tabler/icons-react';
 
 export type IconName =
@@ -93,7 +94,8 @@ export type IconName =
   | 'feather'
   | 'window'
   | 'minimize'
-  | 'power';
+  | 'power'
+  | 'calendar';
 
 interface IconProps {
   name: IconName;
@@ -147,6 +149,7 @@ const iconMap = {
   feather: IconFeather,
   window: IconAppWindow,
   minimize: IconArrowBarDown,
+  calendar: IconCalendar,
   power: IconPower,
 };
 
