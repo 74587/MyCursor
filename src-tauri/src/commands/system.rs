@@ -325,7 +325,6 @@ pub async fn set_close_behavior(minimize_to_tray: bool) -> Result<serde_json::Va
 #[tauri::command]
 #[specta::specta]
 pub async fn get_auth_me(session_token: String, access_token: Option<String>) -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
     let cookie = if !session_token.is_empty() {
         crate::infra::api::CursorApiClient::build_workos_cookie(&session_token)
     } else if let Some(ref at) = access_token {
@@ -338,20 +337,32 @@ pub async fn get_auth_me(session_token: String, access_token: Option<String>) ->
         return Ok(serde_json::json!({"success": false, "message": "缺少有效的 Token"}));
     };
 
+    log_info!("get_auth_me: 请求 cursor.com/api/auth/me, cookie 长度={}", cookie.len());
+
+    let client = reqwest::Client::new();
     let resp = client
-        .get("https://www.cursor.com/api/auth/me")
+        .get("https://cursor.com/api/auth/me")
         .header("Cookie", &cookie)
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36")
+        .header("Accept", "*/*")
+        .header("Referer", "https://cursor.com/dashboard")
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            log_error!("get_auth_me: 网络请求失败: {}", e);
+            e.to_string()
+        })?;
 
     let status = resp.status().as_u16();
     let text = resp.text().await.map_err(|e| e.to_string())?;
+
+    log_info!("get_auth_me: 响应状态={}, 长度={}", status, text.len());
 
     if status == 200 {
         let data: serde_json::Value = serde_json::from_str(&text).unwrap_or(serde_json::json!(null));
         Ok(serde_json::json!({"success": true, "data": data}))
     } else {
+        log_error!("get_auth_me: 请求失败, status={}, body={}", status, &text[..text.len().min(200)]);
         Ok(serde_json::json!({"success": false, "status": status, "message": text}))
     }
 }

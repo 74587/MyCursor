@@ -133,10 +133,12 @@ export const AddAccountForm = memo(({ isOpen, onSuccess, onCancel, onToast }: Ad
           setNewEmail(meResult.data.email);
           onToast(`获取成功！用户: ${meResult.data.name || meResult.data.email}`, "success");
         } else {
-          onToast("AccessToken 获取成功！", "success");
+          console.warn("getAuthMe 返回失败:", meResult);
+          onToast("AccessToken 获取成功！但无法自动获取邮箱，请手动输入", "success");
         }
-      } catch {
-        onToast("AccessToken 获取成功！", "success");
+      } catch (meError) {
+        console.error("getAuthMe 异常:", meError);
+        onToast("AccessToken 获取成功！但获取邮箱时出错，请手动输入", "success");
       }
     } catch (error) {
       console.error("获取 AccessToken 失败:", error);
