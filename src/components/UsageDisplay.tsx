@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import type { DateRange } from "../types/usage";
 import { AggregatedUsageDisplay } from "./AggregatedUsageDisplay";
+import { AggregatedBreakdown } from "./AggregatedBreakdown";
 import { UsageDetailsModal } from "./UsageDetailsModal";
 import { performanceMonitor } from "../utils/performance";
 import { Icon } from "./Icon";
@@ -43,6 +44,7 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
     return { startDate, endDate };
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const [shouldAutoRefresh, setShouldAutoRefresh] = useState(false);
 
   // 组件挂载时加载本地数据
@@ -500,6 +502,37 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
               <Icon name="eye" size={14} style={{ marginRight: '4px' }} />
               查看明细
             </button>
+            <button
+              onClick={() => setShowBreakdown(!showBreakdown)}
+              disabled={!localUsageData}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '4px 12px',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: !localUsageData ? 'var(--text-secondary)' : showBreakdown ? '#fff' : '#8b5cf6',
+                backgroundColor: !localUsageData ? 'var(--bg-secondary)' : showBreakdown ? '#8b5cf6' : 'rgba(139, 92, 246, 0.15)',
+                border: 'none',
+                borderRadius: 'var(--border-radius)',
+                cursor: !localUsageData ? 'not-allowed' : 'pointer',
+                opacity: !localUsageData ? 0.5 : 1,
+                transition: 'all var(--transition-duration) ease',
+              }}
+              onMouseEnter={(e) => {
+                if (localUsageData && !showBreakdown) {
+                  e.currentTarget.style.backgroundColor = 'rgba(139, 92, 246, 0.25)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (localUsageData && !showBreakdown) {
+                  e.currentTarget.style.backgroundColor = 'rgba(139, 92, 246, 0.15)';
+                }
+              }}
+            >
+              <Icon name="chart" size={14} style={{ marginRight: '4px' }} />
+              简洁
+            </button>
           </div>
         </div>
 
@@ -650,6 +683,13 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
             showTitle={false}
             variant="detailed"
           />
+
+            {/* 简洁面板：模型用量分解 */}
+            {showBreakdown && (
+              <div className="mt-4">
+                <AggregatedBreakdown aggregatedUsage={localUsageData} />
+              </div>
+            )}
 
             {/* 模型使用费用趋势图（基于事件数据） */}
             <div className="mt-6">
