@@ -251,19 +251,39 @@ impl TelemetryPatcher {
         Self::patch_extension_main_legacy_inner_transport(content)
     }
 
-    /// `unary(t,n,r,s,o,i,a){` → `_getTransportForService` → `transport.unary`（与 patch-telemetry.sh 一致）
+    /// 与 patch-cursor-telemetry 上游一致的注入逻辑
+    ///
+    /// 匹配模式（参数名灵活，适配 Cursor 代码压缩/混淆后的变量名变化）：
+    /// `unary(t,n,<5个任意参数>){const <var>=e._getTransportForService(t.typeName,n.name);
+    ///  if(void 0===<var>)throw new Error("INVARIANT VIOLATION: ...");
+    ///  return <var>.transport.unary(t,n,<5个任意参数>)}`
+    ///
+    /// 注意：Rust regex crate 不支持反向引用 `\1`，所以用多个捕获组 + 手动验证一致性。
     fn patch_extension_main_upstream(content: &str) -> Option<String> {
-        // 必须用 r#"..."#：模式中包含 JS 源码里的双引号，普通 r"..." 会在 \" 处被截断
-        let Ok(re) = Regex::new(
-            r#"unary\(t,n,r,s,o,i,a\)\{const ([a-zA-Z_$][a-zA-Z0-9_$]*)=e\._getTransportForService\(t\.typeName,n\.name\);if\(void 0===\1\)throw new Error\("INVARIANT VIOLATION: Transport is undefined for service: "\+t\.typeName\);return \1\.transport\.unary\(t,n,r,s,o,i,a\)\}"#,
-        ) else {
+        let re = Regex::new(concat!(
+            r#"unary\((t,n(?:,[a-zA-Z_$][a-zA-Z0-9_$]*){5})\)"#,
+            r#"\{const ([a-zA-Z_$][a-zA-Z0-9_$]*)=e\._getTransportForService\(t\.typeName,n\.name\);"#,
+            r#"if\(void 0===([a-zA-Z_$][a-zA-Z0-9_$]*)\)throw new Error\("#,
+            r#""INVARIANT VIOLATION: Transport is undefined for service: "\+t\.typeName\);"#,
+            r#"return ([a-zA-Z_$][a-zA-Z0-9_$]*)\.transport\.unary\((t,n(?:,[a-zA-Z_$][a-zA-Z0-9_$]*){5})\)\}"#,
+        )).ok()?;
+
+        let caps = re.captures(content)?;
+        let params1 = caps.get(1)?.as_str();
+        let var_def = caps.get(2)?.as_str();
+        let var_check = caps.get(3)?.as_str();
+        let var_ret = caps.get(4)?.as_str();
+        let params2 = caps.get(5)?.as_str();
+
+        if var_def != var_check || var_def != var_ret || params1 != params2 {
             return None;
-        };
-        let m = re.find(content)?;
+        }
+
+        let m = caps.get(0)?;
         let full = m.as_str();
-        let prefix = "unary(t,n,r,s,o,i,a){";
-        let insert_at = full.find(prefix)? + prefix.len();
-        // 与上游脚本同一拦截语义；仅多一层注释便于识别
+        let header = format!("unary({})", params1);
+        let insert_at = full.find(&header)? + header.len() + 1;
+
         let intercept = concat!(
             "/* __MYCURSOR_TELEMETRY_PATCH__ */",
             "try{if((\"aiserver.v1.AnalyticsService\"===t.typeName&&\"BootstrapStatsig\"!==n.name)",
@@ -272,6 +292,7 @@ impl TelemetryPatcher {
             "return Promise.resolve({stream:!1,service:t,method:n,",
             "header:new Headers,message:_O,trailer:new Headers})}}catch(_){}",
         );
+
         let mut out = String::with_capacity(content.len() + intercept.len());
         out.push_str(&content[..m.start()]);
         out.push_str(&full[..insert_at]);
