@@ -38,6 +38,9 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [shouldAutoRefresh, setShouldAutoRefresh] = useState(false);
+  const [isEditingDateRange, setIsEditingDateRange] = useState(false);
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
 
   // 组件挂载时先获取计费周期，再加载本地数据
   useEffect(() => {
@@ -369,8 +372,53 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
   };
 
   const formatDate = useCallback((date: Date): string => {
-    return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+    return date.toLocaleString("zh-CN", {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+    });
   }, []);
+
+  const toDatetimeLocalValue = useCallback((date: Date): string => {
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }, []);
+
+  const handleEditDateRange = useCallback(() => {
+    if (dateRange) {
+      setEditStartDate(toDatetimeLocalValue(dateRange.startDate));
+      setEditEndDate(toDatetimeLocalValue(dateRange.endDate));
+      setIsEditingDateRange(true);
+    }
+  }, [dateRange, toDatetimeLocalValue]);
+
+  const handleApplyCustomDateRange = useCallback(() => {
+    const start = new Date(editStartDate);
+    const end = new Date(editEndDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+    if (start >= end) return;
+    setDateRange({ startDate: start, endDate: end });
+    setIsEditingDateRange(false);
+  }, [editStartDate, editEndDate]);
+
+  const handleResetBillingCycle = useCallback(async () => {
+    if (!token) return;
+    setIsEditingDateRange(false);
+    setBillingCycleLoading(true);
+    try {
+      const result: any = await invoke("get_current_billing_cycle", { token });
+      if (result.success && result.startDate && result.endDate) {
+        setDateRange({
+          startDate: new Date(result.startDate),
+          endDate: new Date(result.endDate),
+        });
+        setBillingCycleError(null);
+      }
+    } catch (err) {
+      console.error("重新获取计费周期失败:", err);
+    } finally {
+      setBillingCycleLoading(false);
+    }
+  }, [token]);
 
   // 检测是否开启了自定义背景或透明主题
   const hasCustomBackground = !!(config.customBackground?.enabled && config.customBackground?.imageUrl);
@@ -523,7 +571,7 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
             正在获取计费周期...
           </div>
         )}
-        {!billingCycleLoading && dateRange && (
+        {!billingCycleLoading && dateRange && !isEditingDateRange && (
           <div
             className="mb-4 flex items-center gap-2 px-3 py-2 rounded-md text-sm"
             style={{
@@ -540,6 +588,82 @@ export const UsageDisplay: React.FC<UsageDisplayProps> = ({
                 （{billingCycleError}）
               </span>
             )}
+            <button
+              onClick={handleEditDateRange}
+              className="ml-auto px-2 py-0.5 rounded text-xs"
+              style={{
+                backgroundColor: 'rgba(74, 137, 220, 0.12)',
+                color: 'var(--primary-color)',
+              }}
+              title="自定义计费周期"
+            >
+              自定义
+            </button>
+          </div>
+        )}
+        {!billingCycleLoading && isEditingDateRange && (
+          <div
+            className="mb-4 px-3 py-3 rounded-md text-sm"
+            style={{ backgroundColor: 'rgba(74, 137, 220, 0.08)' }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Icon name="calendar" size={14} style={{ color: 'var(--primary-color)' }} />
+              <span style={{ color: 'var(--primary-color)', fontWeight: 500 }}>自定义计费周期</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="datetime-local"
+                step="1"
+                value={editStartDate}
+                onChange={(e) => setEditStartDate(e.target.value)}
+                className="px-2 py-1 rounded border text-xs"
+                style={{
+                  backgroundColor: 'var(--bg-primary)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              <span style={{ color: 'var(--text-secondary)' }}>~</span>
+              <input
+                type="datetime-local"
+                step="1"
+                value={editEndDate}
+                onChange={(e) => setEditEndDate(e.target.value)}
+                className="px-2 py-1 rounded border text-xs"
+                style={{
+                  backgroundColor: 'var(--bg-primary)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              <button
+                onClick={handleApplyCustomDateRange}
+                className="px-2 py-1 rounded text-xs font-medium"
+                style={{
+                  backgroundColor: 'var(--primary-color)',
+                  color: '#fff',
+                }}
+              >
+                应用
+              </button>
+              <button
+                onClick={handleResetBillingCycle}
+                className="px-2 py-1 rounded text-xs"
+                style={{
+                  backgroundColor: 'rgba(74, 137, 220, 0.12)',
+                  color: 'var(--primary-color)',
+                }}
+              >
+                重置
+              </button>
+              <button
+                onClick={() => setIsEditingDateRange(false)}
+                className="px-2 py-1 rounded text-xs"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                取消
+              </button>
+            </div>
           </div>
         )}
 
