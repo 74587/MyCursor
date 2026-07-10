@@ -26,6 +26,8 @@ Cursor IDE 账户与 Machine ID 管理工具，免安装单文件运行，单实
 - 本地 HTTP 服务仅监听 `127.0.0.1`，用于在不重启 Cursor 的前提下更新 Token 与 Machine ID
 
 ### 使用量统计
+- 自动获取计费周期，精确显示到时分秒
+- 支持自定义计费周期（可手动设置开始 / 结束时间到秒级）
 - 查看账户用量、消费明细、模型调用记录
 - 支持聚合用量、用户分析、事件明细
 
@@ -113,31 +115,52 @@ npm run format       # 格式化
 
 ```
 MyCursor/
-├── src/                        # React 前端
-│   ├── features/               # 按业务域组织的页面与局部组件 / hooks
-│   │   ├── identity/           # Machine ID 管理
-│   │   ├── accounts/           # 账号管理
-│   │   ├── analytics/          # 用量统计
-│   │   ├── seamless/           # 无感换号
-│   │   └── settings/           # 设置
-│   ├── components/             # 通用 UI 组件（卡片 / 表单 / 图表等）
-│   ├── services/               # 服务层（账户、Machine ID、用量统计、配置等）
-│   ├── hooks/                  # 自定义 Hooks
-│   ├── types/                  # TypeScript 类型
-│   ├── context/                # React Context
-│   ├── styles/                 # 全局样式与主题（深色 / 浅色 / 透明）
-│   ├── workers/                # Web Worker（数据预处理等）
-│   └── utils/                  # 工具函数（加解密、性能分析、IndexedDB 等）
-├── src-tauri/                  # Tauri Rust 后端
+├── src/                            # React 前端
+│   ├── features/                   # 按业务域组织的页面与局部组件 / hooks
+│   │   ├── identity/               # Machine ID 管理
+│   │   ├── accounts/               # 账号管理
+│   │   ├── seamless/               # 无感换号
+│   │   ├── advanced/               # 高级功能
+│   │   └── settings/               # 设置
+│   ├── components/                 # 通用 UI 组件（图表 / 用量展示 / 模态框等）
+│   ├── services/                   # 服务层（账户、用量统计、配置、主题等）
+│   ├── types/                      # TypeScript 类型定义
+│   ├── context/                    # React Context（主题等）
+│   ├── styles/                     # 全局样式与主题（深色 / 浅色 / 透明）
+│   ├── workers/                    # Web Worker（数据预处理）
+│   └── utils/                      # 工具函数（加解密、性能分析、IndexedDB 等）
+├── src-tauri/                      # Tauri Rust 后端（分层架构）
 │   └── src/
-│       ├── main.rs             # Tauri 入口
-│       ├── lib.rs              # Tauri 命令注册与应用入口
-│       ├── account_manager.rs  # 账户管理逻辑
-│       ├── auth_checker.rs     # 认证 & 使用量查询
-│       ├── machine_id.rs       # Machine ID 读取 / 备份 / 重置
-│       ├── seamless.rs         # 无感换号 HTTP 服务与注入逻辑
-│       └── logger.rs           # 日志系统
-├── .github/workflows/          # CI/CD（tag 触发自动构建发布）
+│       ├── main.rs                 # Tauri 入口
+│       ├── lib.rs                  # 命令注册与应用入口
+│       ├── error.rs                # 统一错误处理
+│       ├── logger.rs               # 日志系统
+│       ├── commands/               # Tauri 命令层（前端 ↔ 后端桥接）
+│       │   ├── account.rs          # 账户管理命令
+│       │   ├── analytics.rs        # 用量统计命令
+│       │   ├── identity.rs         # Machine ID 命令
+│       │   ├── seamless.rs         # 无感换号命令
+│       │   ├── system.rs           # 系统操作命令
+│       │   ├── telemetry.rs        # 遥测命令
+│       │   └── window.rs           # 窗口管理命令
+│       ├── services/               # 业务逻辑层
+│       │   ├── account_service.rs
+│       │   ├── analytics_service.rs
+│       │   ├── auth_service.rs
+│       │   ├── identity_service.rs
+│       │   └── seamless_service.rs
+│       ├── domain/                 # 领域模型
+│       │   ├── account.rs
+│       │   ├── auth.rs
+│       │   ├── identity.rs
+│       │   └── usage.rs
+│       └── infra/                  # 基础设施层
+│           ├── api/                # HTTP 客户端（Cursor API 调用）
+│           ├── cursor/             # Cursor 本地文件（路径 / 存储 / 进程 / workbench）
+│           ├── platform/           # 跨平台适配（Windows / macOS / Linux）
+│           ├── seamless/           # 无感换号（HTTP 服务 & 注入脚本）
+│           └── store/              # 本地数据持久化（账户 / 用量 / 事件 / 配置缓存）
+├── .github/workflows/              # CI/CD（tag 触发自动构建发布）
 ├── package.json
 ├── tailwind.config.js
 └── vite.config.ts
